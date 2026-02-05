@@ -1,0 +1,384 @@
+---
+title: 'Línea del Tiempo: SEQUÍAS'
+author: "Enrique Cerón"
+date: "2026-02-03"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## **Resumen**
+
+El presente documento tiene la finalidad de explicar el procedimiento que se llevó acabo para crear una línea del tiempo con los shapes del Monitor de Sequía en México (MSM). Explicaremos desde como procesar los archivos y sus datos hasta como crear los complementos y herramientas de la línea del tiempo.
+
+## Procesamiento de Datos
+
+*[Este apartado describe el archivo Juntar Shapes Sequias.R y su producto, el GeoJSON Sequias_SimplificadoadT150.geojson]*
+
+Los archivos vienen distribuidos en un una serie de carpetas por año (a la fecha de la redacción de este documento están de 2007 a 2025), cada una de ellas a su vez tiene una colección de subcarpetas comprimidas .zip, donde su nombre incluye el prefijo "mexseq\_" seguido del año, el mes y, a partir de 2014, también el día.
+
+Lo primero que haremos será descompimir todas ellas en carpetas separadas, WinRAR tiene esa opción al seleccionarlas todas.
+
+A partir de ahora nos referiremos a estas carpetas descomprimidas como "**Carpetas por tiempo**". En ellas vienen los shapes que buscamos, en nuestro caso solo nos importan aquellos que describen las coordenadas para cada clasificación de la intensidad de la sequía (D0, D1, D2, D3 y D4), que son aquellos que poseen un nombre compuesto por: el nombre de la carpeta por tiempo en la que nos encontramos seguido de un guión bajo y alguna de las cinco clasificaciones de sequías en minusculas.
+
+**Empezamos con R:** Nos situamos en el mismo nivel que la carpeta madre "SHAPES SEQUIAS" y creamos el script de R.
+
+Cargaremos las librerías requeridas.
+
+```{r cars}
+library(sf)
+library(dplyr)
+```
+
+Creamos una pequeña función que le cambia el sistema de coordenadas de referencia al shape, para usar más adelante.
+
+```{r pressure, echo=FALSE}
+ChangeCRS=function(X){
+  return(st_transform(X,crs=4326))
+}
+```
+
+Definimos tres objetos auxiliares, una lista con tantos espacio como carpetas por tiempo existan entre todos los años, un vector del 2007 al año más reciente que tengan las carpetas por año, pero como caracteres y una variable con valor 1.
+
+```{r pressure, echo=FALSE}
+Lista_shapes=vector("list", length = 385)
+
+Años=as.character(c(2007:2025))
+
+k=1
+```
+
+Aquí viene una parte muy importante pero también muy técnica, donde jugaremos con las rutas.
+
+Primero abrimos un ciclo for que corra sobre el vector Años, y con la función *list.dirs()* nos fijamos en la ruta-nombre de todas aquellas carpetas que, si por ejemplo estamos en el primero que es 2007, tengan el prefijo "SHAPES SEQUIAS/2007/" y lo guardamos todo en un arreglo. Quitamos la primera, pues la primera es directamente la carpeta del año, y nosotros solo queremos las carpetas por tiempo de ese año.
+
+```{r pressure, echo=FALSE}
+for(Año in Años){
+  Meses=list.dirs(path = paste0("SHAPES SEQUIAS/",Año,"/"),recursive = TRUE,full.names = TRUE)
+  Meses = Meses[-1]
+```
+
+A continuación haremos algo parecido a lo que acabamos de hacer. Abrimos un ciclo *for* que corra sobre el vector Meses, y con la función *list.file()* nos fijamos en la ruta-nombre de todos aquellos archivos que, si por ejemplo estamos en el primer año que es 2007 y la primera Carpeta de tiempo que es mexseq_200701, tengan el prefijo "SHAPES SEQUIAS/2007/mexseq_200701/" y que tengan la extensión .shp, para guardarlos en un arreglo llamado "Names".
+
+Usando la función *lapply* leemos cada uno de los shapes que hemos encontrado y pasamos su crs a 4326 para guardarlos en otro arreglo.
+
+```{r pressure, echo=FALSE}
+  for(Mes in Meses){
+    secuenia=paste0(Mes,"/")
+    Names=list.files(path = secuenia, pattern = ".shp$", full.names = T, recursive = T)
+    Shapes=Names |> lapply(read_sf) |> lapply(ChangeCRS)
+
+```
+
+Abrimos otro ciclo for (sí, otro for, ya llevamos tres concatenados), este correra de 1 hasta la cantidad de shapes. Aquí simplemente vamos a crear las variables de Nivel_Sequia, Año, Mes y Dia. Es relativamente simple.
+
+¡OJO! Como ya dijimos, solo de 2014 en adelante incluyen el día, por lo que los shapes de meses anteriores tendrán la variable Dia vacía, no hay ningún problema, esto lo veremos más adelante.
+
+```{r pressure, echo=FALSE}
+    for(i in 1:length(Shapes)){
+      Shapes[[i]]$Nivel_Sequia=vector(mode = "character", length = nrow(Shapes[[i]]))
+      Shapes[[i]]$Nivel_Sequia[grepl("d0",tolower(Shapes[[i]]$Archivo))]="d0"
+      Shapes[[i]]$Nivel_Sequia[grepl("d1",tolower(Shapes[[i]]$Archivo))]="d1"
+      Shapes[[i]]$Nivel_Sequia[grepl("d2",tolower(Shapes[[i]]$Archivo))]="d2"
+      Shapes[[i]]$Nivel_Sequia[grepl("d3",tolower(Shapes[[i]]$Archivo))]="d3"
+      Shapes[[i]]$Nivel_Sequia[grepl("d4",tolower(Shapes[[i]]$Archivo))]="d4"
+      Shapes[[i]]$Año=rep(Año,nrow(Shapes[[i]]))
+      Shapes[[i]]$Mes=rep(substr(strsplit(Mes,"_")[[1]][2],5,7),nrow(Shapes[[i]]))
+      Shapes[[i]]$Dia=rep(strsplit(Mes,"_")[[1]][3],nrow(Shapes[[i]]))
+    }
+```
+
+Ahora simplemente juntamos los shapes en uno solo (para ese año y esa Carpeta de tiempo), nos quedamos con las variables que nos interesan y solo con aquellas entradas que vengan de los shapes que describen las coordenadas de las clasificaciones de las sequías. Esto lo guardamos en nuestra lista auxiliar Lista_shapes y en posiciones que no se repitan, para ello nos apoyamos de k. Ya solo cerramos los dos ciclos iniciales
+
+```{r pressure, echo=FALSE}
+Pre=(bind_rows(Shapes) |> dplyr::select(Nivel_Sequia,Año,Mes,Dia,geometry))
+    Lista_shapes[[k]]=Pre[Pre$Nivel_Sequia!="",]
+    k=k+1
+  }
+}
+```
+
+¡Perfecto! Ya tenemos una lista con un shape por Carpeta de tiempo. Ahora solo vamos a juntar todos en un solo shape con ayuda de las funciones *do.call()* y *rbind.fill()*. Y para que nada falle pasamos a sf con geometrías de multipoligono y usamos *st_make_valid()*.
+
+```{r pressure, echo=FALSE}
+Data=do.call(plyr::rbind.fill,Lista_shapes)
+Base=st_cast(st_as_sf(Data),to = "MULTIPOLYGON") |> st_make_valid()
+}
+```
+
+En este punto podemos decir que ya tenemos nuestros datos listos para usar, sin embargo, y como quizá te hallas dado cuenta, este último shape donde juntamos todo es muuuuuuuuuuuuy pesado. Intentaremos bajar su peso con *st_simplify()*. Para ello, apagamos las coordenadas esféricas con *sf_use_s2(F)* y volvemos así a coordenadas planas (o Euclidiana para mis compas de mate). Pasamosa una CRS en métros como lo es la 3857 y usamos *st_simplify()* con *dTolerance = 150* como máximo, pues un valor más alto haría que se vean horribles los mapas.
+
+Posteriormente la regresamos a nuestra CRS de confianza y lo guardamos como un GeoJSON para utilizar.
+
+```{r pressure, echo=FALSE}
+sf::sf_use_s2(F)
+
+Base_Metrica=st_transform(Base,3857)
+
+New=st_simplify(x = Base_Metrica,preserveTopology = T,dTolerance = 150)
+
+Base2=st_transform(New,4326)
+st_write(Base2 , "Sequias_SimplificadoadT150.geojson", driver = "GeoJSON")
+```
+
+¡Listo! ya tenemos nuestros datos, juntos, limpios y perfectos para usar, o bueno, casi, pero lo que falta lo veremos en la siguiente parte.
+
+## Línea del Tiempo
+
+*[Este apartado describe el código en el archivo Linea del Tiempo.R y sus productos, las páginas web MapaSequias_Periodo2007_2013.html, MapaSequias_Periodo2014_2019.html, MapaSequias_Periodo2020_2022.html y MapaSequias_Periodo2023_2025.html]*
+
+Si deseas ver algún ejemplo más sencillo (o mejor hecho más bien) utilizando ***leaftime*** te invitamos a visitar el siguiente link: <https://examples.rpkg.net/package/leaftime> que es de donde nosotros tomamos la idea.
+
+Ahora sí, como siempre, cargamos las librerías, y el GeoJSON que creamos antes.
+
+```{r pressure, echo=FALSE}
+library(sf)
+library(dplyr)
+library(leaflet)
+library(leafem)
+library(leaftime)
+library(leaflet.extras)
+library(leaflet.extras2)
+library(htmltools)
+library(htmlwidgets)
+
+sf_data=read_sf("Sequias_SimplificadoadT150.geojson")
+```
+
+Para crear la línea del tiempo necesitamos una fecha de inicio (start) y una de final (end). Para ello necesitamos que esté en formato Date como Año-Mes-Día (más concretamente AAAA-MM-DD). Podemos añadirles una hora, también pero esto no es estrictamente necesario, en nuestro ejemplo sí lo hicimos
+
+En el código a continuación cremaos las fechas necesarias con la función *as.POSIXct()* (si tu no quieres usar hora puedes usar *as.Date()*). Para ello fue necesario crear un día a aquellos registros que no contaban con su variable de día (que como habíamos dicho son los anteriores a 2014).
+
+El código es un poco rebuscado pero efectivo, si así lo quieres puedes mirarlo con atención.
+
+```{r pressure, echo=FALSE}
+sf_data$end=character(nrow(sf_data))
+sf_data$end[!is.na(sf_data$Dia)]=paste0(sf_data$Año[!is.na(sf_data$Dia)],"-",sf_data$Mes[!is.na(sf_data$Dia)],"-",sf_data$Dia[!is.na(sf_data$Dia)])
+
+m30=c("04","06","09","11")
+m31=c("01","03","05","07","08","10","12")
+bis=c("2008","2012","2016","2020","2024")
+
+sf_data$end[is.na(sf_data$Dia) & sf_data$Mes %in% m30]=paste0(sf_data$Año[is.na(sf_data$Dia) & sf_data$Mes %in% m30],
+                                                                "-",
+                                                                sf_data$Mes[is.na(sf_data$Dia) & sf_data$Mes %in% m30],
+                                                                "-30 23:59:59")
+sf_data$end[is.na(sf_data$Dia) & sf_data$Mes %in% m31]=paste0(sf_data$Año[is.na(sf_data$Dia) & sf_data$Mes %in% m31],
+                                                                "-",
+                                                                sf_data$Mes[is.na(sf_data$Dia) & sf_data$Mes %in% m31],
+                                                                "-31 23:59:59")
+
+sf_data$end[is.na(sf_data$Dia) & sf_data$Mes == "02" & !(sf_data$Año %in% bis)]=paste0(sf_data$Año[is.na(sf_data$Dia) & sf_data$Mes == "02" & !(sf_data$Año %in% bis)],
+                                                                                         "-",
+                                                                                         sf_data$Mes[is.na(sf_data$Dia) & sf_data$Mes == "02" & !(sf_data$Año %in% bis)],
+                                                                                         "-28 23:59:59")
+
+sf_data$end[is.na(sf_data$Dia) & sf_data$Mes == "02" & sf_data$Año %in% bis]=paste0(sf_data$Año[is.na(sf_data$Dia) & sf_data$Mes == "02" & sf_data$Año %in% bis],
+                                                                                         "-",
+                                                                                         sf_data$Mes[is.na(sf_data$Dia) & sf_data$Mes == "02" & sf_data$Año %in% bis],
+                                                                                         "-29 23:59:59")
+
+
+sf_data$start=character(nrow(sf_data))
+sf_data$start[is.na(sf_data$Dia)]=paste0(sf_data$Año[is.na(sf_data$Dia)],"-",sf_data$Mes[is.na(sf_data$Dia)],"-01 00:00:01")
+sf_data$start[sf_data$Dia =="15" & !is.na(sf_data$Dia)]=paste0(sf_data$Año[sf_data$Dia =="15" & !is.na(sf_data$Dia)],
+                                                               "-",
+                                                               sf_data$Mes[sf_data$Dia =="15" & !is.na(sf_data$Dia)],
+                                                               "-01 00:00:01")
+sf_data$start[sf_data$Dia %in% as.character(c(28:31))]=paste0(sf_data$Año[sf_data$Dia %in% as.character(c(28:31))],
+                                                              "-",
+                                                              sf_data$Mes[sf_data$Dia %in% as.character(c(28:31))],
+                                                              "-16 00:00:01")
+
+sf_data$end=as.POSIXct(sf_data$end,format="%Y-%m-%d %H:%M:%S")
+sf_data$start=as.POSIXct(sf_data$start,format="%Y-%m-%d %H:%M:%S")
+sf_data=sf_data|>select(Nivel_Sequia,Año,Mes,Dia,start,end,geometry)
+```
+
+Ahora creamos las categorías y la paleta de colores para la simbología de los mapas
+
+```{r pressure, echo=FALSE}
+categorias=c("(D0) Anormalmente Seco",
+             "(D1) Sequía Moderada",
+             "(D2) Sequía Severa",
+             "(D3) Sequía Extrema",
+             "(D4) Sequía Excepcional")
+paleta_categorias=colorFactor(palette = c(rgb(255,255,0, maxColorValue = 255),
+                                          rgb(255,211,127, maxColorValue = 255),
+                                          rgb(230,152,0, maxColorValue = 255),
+                                          rgb(230,0,0, maxColorValue = 255),
+                                          rgb(115,0,0, maxColorValue = 255)),
+                              domain =categorias,alpha = T, na.color = NA)
+```
+
+Ahora, aquí un problema; dada la cantidad de entradas, aparte de simplificarlo previamente habrá que partirlo en 4 periodos para poder subirlo a GitHub, de otra forma la línea del tiempo .html pesaría más de 100MB, además de tardar mucho en cargar uno solo al momento de cargarlo en el futuro index.html
+
+Así que lo vamos a partir por periodos 2007-2013,2014-2019,2020-2022 y 2023-2025, y crearemos estos elementos auxiliares
+
+```{r pressure, echo=FALSE}
+Auxiliar=sf_data
+P1=c(2007:2013)
+P2=c(2014:2019)
+P3=c(2020:2022)
+P4=c(2023:2025)
+```
+
+Aquí empieza la mágia, abriremos un ciclo para movernos en los periodos y no tener que ejecutar varas veces.
+
+```{r pressure, echo=FALSE}
+for(i in 1:4){
+  sf_data=Auxiliar
+  sf_data=Auxiliar #Esto para tener constantemente todos los datos
+  if(i==1){
+    sf_data=sf_data[as.numeric(sf_data$Año) %in% P1,]
+  }
+  if(i==2){
+    sf_data=sf_data[as.numeric(sf_data$Año) %in% P2,]
+  }
+  if(i==3){
+    sf_data=sf_data[as.numeric(sf_data$Año) %in% P3,]
+  }
+  if(i==4){
+    sf_data=sf_data[as.numeric(sf_data$Año) %in% P4,]
+  }
+```
+
+Lo pasamos por *geojson_json()* (la verdad desconozco la razón exacta, pero ayuda a que los mapas funcionen) y creamos nuestro mapa como ya es usual, usando en este caso las coordenadas aproximadas de la bbox del centro del primer mapa. Además añadimos la simbología con *addLegend()*
+
+```{r pressure, echo=FALSE}
+  geojson = geojsonio::geojson_json(sf_data) 
+  Mapa_Sequias = leaflet() |> addTiles() |>
+    setView(lng = -102.7482, lat = 24.48856, zoom = 5) |> 
+    addLegend("topright", pal = paleta_categorias,values = categorias, title = "Intensidad de Sequías",opacity = 1
+    ) |> #Aquí añadimos la linea del tiempo
+```
+
+Usamos ahora sí la función estelar de este proyecto *addTimelien()*. Hacemos que la reproducción de la línea del tiempo dure al 15 segundos y que en el slider se muestra la fecha en formato Año-Mes-Día, pues de otra por defecto muestra la hora y el nombre del día, cosas qeu realmente no nos importan. Además usamos una función que asigna adecuadamente el color a cada mapa, pues por defecto addTimeline no tiene una opción para el color de los diferentes poligonos de cada mapa (o capa) de la línea del tiempo.
+
+```{r pressure, echo=FALSE}
+    addTimeline(data = geojson,group = "timeline_layer",
+                sliderOpts = sliderOptions(duration = 15000, showTicks = TRUE,formatOutput = htmlwidgets::JS("
+                function(date) {
+                    var d = new Date(date);
+                    var year = d.getFullYear();
+                    var month = ('0' + (d.getMonth() + 1)).slice(-2);
+                    var day = ('0' + d.getDate()).slice(-2);
+                    return year + '-' + month + '-' + day;
+                }")),width = "65%",
+                timelineOpts = timelineOptions(
+                  style = htmlwidgets::JS(
+                    "function(feature) {
+          if (feature.properties.Nivel_Sequia === 'd4'){
+            return { color: 'rgb(115,0,0)', weight: 3 };
+          }else{
+            if (feature.properties.Nivel_Sequia === 'd3'){
+              return { color: 'rgb(230,0,0)', weight: 3 };
+            }else{
+              if (feature.properties.Nivel_Sequia === 'd2'){
+                return { color: 'rgb(230,152,0)', weight: 3 };
+              }else{
+                if (feature.properties.Nivel_Sequia === 'd1'){
+                  return { color: 'rgb(255,211,127)', weight: 3 };
+                }else{
+                  if (feature.properties.Nivel_Sequia === 'd0'){
+                    return { color: 'rgb(255,255,0)', weight: 3 };
+                  }
+                }
+              }
+            }
+          }
+        }"
+                  ) 
+                )
+```
+
+Ahora hacemos uso de nuestra increíblemente polivalente función *onRender()* para una sola cosa: Crear un buscador de fechas, pues por defecto no existe y el *addSearchfeatures()* no funciona para *addTimeline()*.
+
+Primero creamos la caja que permite introducir el texto para la fecha.
+
+```{r pressure, echo=FALSE}
+    ) |> #Aqui viene lo feo
+    onRender("function(el, x) {
+      var map = this;
+      var DateSearchControl = L.Control.extend({
+        options: { position: 'bottomleft' },
+
+        onAdd: function(map) {
+          var container = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
+          container.style.backgroundColor = 'white';
+          container.style.padding = '5px';
+          var input = L.DomUtil.create('input', 'date-input-custom', container);
+          input.type = 'text';
+          input.placeholder = 'AAAA-MM-DD -> Enter';
+          input.style.width = '170px';
+```
+
+Hacemos que reaccione al enter con "keydown" y el keycode===13,
+
+```{r pressure, echo=FALSE}
+          L.DomEvent.disableClickPropagation(container);
+          L.DomEvent.on(input, 'keydown', function(e) {
+             if (e.keyCode === 13) {
+                 
+                 var fechaObj = new Date(input.value + 'T12:00:00'); 
+                 var fechaTime = fechaObj.getTime();
+```
+
+Y añadimos una alerta cuando no se pueda extraer una fecha de aquello que el usuario haya escrito en la caja del buscador. OJO, afortunadamente el *getTime()* se comporta lo suficientemente bonito al solo escribir el Año o el Año-Mes, pues no es completamente necesario escribir la fecha completa, sin embargo sí que se debe escribir en ese orden, de año a día.
+
+```{r pressure, echo=FALSE}
+                 //Para usar el formato correcto
+                 if (isNaN(fechaTime)) {
+                    alert('Use el formato: Año-Mes-Día para su búsqueda');
+                    return;
+                 }
+```
+
+Ya tenemos la fecha, ahora lo más feo es que todavía hay que encontrar el mapa con esa fecha y actualizarlo junto a la barra del sliderDe otra forma se puede actualizar el mapa pero no la barra del slider, lo que haría contraproducente el reproductor del slider, pues empezaría desde la última fecha en la barra y no en la que se acaba de buscar. Para ello, buscamos el input de tipo 'range' dentro de los controles del mapa, donde el slider de tiempo suele ser el único input de rango
+
+```{r pressure, echo=FALSE}
+                 var sliderInput = document.querySelector('.leaflet-control input[type=\"range\"]');
+                     sliderInput.value = fechaTime;
+```
+
+Y esto es lo más técnico, pues necesitamos disparar dos eventos; uno para mover el mapa de la línea del tiempo y otro para confirmar que se movió el slider. Después de eso cerramos todo y añadimos nuestro buscador.
+
+```{r pressure, echo=FALSE}
+                     var eventInput = new Event('input', { bubbles: true });
+                     var eventChange = new Event('change', { bubbles: true });
+
+                     sliderInput.dispatchEvent(eventInput);
+                     sliderInput.dispatchEvent(eventChange);
+
+             }
+          });
+          return container;
+        }
+      });
+      
+      map.addControl(new DateSearchControl());
+    }
+  ")|>
+```
+
+Añadimos el logo de Planeación y guardamos cada uno de los mapas
+
+```{r pressure, echo=FALSE}
+    addFullscreenControl()|>addLogo(img = "https://raw.githubusercontent.com/JairEsc/Gob/main/Otros_archivos/imagenes/Planeacion_sigeh.png",
+                                    ,position = "bottomright",width = 250)
+  Mapa_Sequias
+  saveWidget(Mapa_Sequias, file = paste0("MapaSequias_Periodo",sf_data$Año[1],"_",sf_data$Año[length(sf_data$Año)],".html"), selfcontained = T)
+}
+```
+
+LISTO! Hemos creado las líneas del tiempo que necesitabamos.
+
+Sé que mi explicación debe haber resultado de poca ayuda, pero sientete libre de exlorar lo códigos, mejorarlos y usarlos en tus actividades futuras.
+
+Nosotros creamos una página que recopila las lineas del tiempo de los cuatro periodos y da una pequeña explicación de las clasificaciones vistas.
+
+Puedes verlo en el archivo index.html
+
+Saludos cordiales y mucho éxito.
