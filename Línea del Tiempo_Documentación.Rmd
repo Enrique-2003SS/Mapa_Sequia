@@ -228,7 +228,7 @@ P3=c(2020:2022)
 P4=c(2023:2025)
 ```
 
-Aquí empieza la magia, abriremos un ciclo para movernos en los periodos y no tener que ejecutar varas veces.
+Aquí empieza la magia, abriremos un ciclo para movernos en los periodos y no tener que ejecutar varas veces y de paso lo guardamos para tenerlo a la mano.
 
 ```{r}
 for(i in 1:4){
@@ -246,6 +246,7 @@ for(i in 1:4){
   if(i==4){
     sf_data=sf_data[as.numeric(sf_data$Año) %in% P4,]
   }
+  st_write(sf_data, paste0("MapaSequias_",sf_data$Año[1],"_",sf_data$Año[length(sf_data$Año)],".geojson"), driver = "GeoJSON")
 ```
 
 Lo pasamos por *geojson_json()* (la verdad desconozco la razón exacta, pero ayuda a que los mapas funcionen) y creamos nuestro mapa como ya es usual, usando en este caso las coordenadas aproximadas de la bbox del centro del primer mapa. Además, añadimos la simbología con *addLegend()*

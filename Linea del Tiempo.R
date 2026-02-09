@@ -107,6 +107,8 @@ for(i in 1:4){
   if(i==4){
     sf_data=sf_data[as.numeric(sf_data$Año) %in% P4,]
   }
+
+  st_write(sf_data, paste0("MapaSequias_",sf_data$Año[1],"_",sf_data$Año[length(sf_data$Año)],".geojson"), driver = "GeoJSON")
   
   geojson = geojsonio::geojson_json(sf_data) #Para poderlos leer bien en la línea del tiempo
   #Creamos nuestro mapa como ya es usual
