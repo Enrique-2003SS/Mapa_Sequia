@@ -8,9 +8,9 @@ library(leaflet.extras2)
 library(htmltools)
 library(htmlwidgets)
 
-#setwd("../Enrique(Practicas)/P1_Sequías/Mapa_Sequia/")
+#setwd("../../../Enrique(Practicas)/P1_Sequías/Mapa_Sequia/")
 #Cargamos el GeoJSON con las geometrías simplificadas
-sf_data=read_sf("Sequias_SimplificadoadT150.geojson")
+sf_data=read_sf("../Sequias_SimplificadoadT150.geojson")
 
 #Para crear la línea del tiempo necesitamos una fecha de inicio y una de final
 #Para ello necesitamos que este en formato Date como Año-Mes-Día (más concretamente AAAA-MM-DD)
@@ -44,7 +44,12 @@ sf_data$end[is.na(sf_data$Dia) & sf_data$Mes == "02" & sf_data$Año %in% bis]=pa
                                                                                          sf_data$Mes[is.na(sf_data$Dia) & sf_data$Mes == "02" & sf_data$Año %in% bis],
                                                                                          "-29 23:59:59")
 
-
+sf_data$end[!is.na(sf_data$Dia)]=paste0(sf_data$Año[!is.na(sf_data$Dia)],
+                                         "-",
+                                         sf_data$Mes[!is.na(sf_data$Dia)],
+                                         "-",
+                                         sf_data$Dia[!is.na(sf_data$Dia)],
+                                         " 23:59:59")
 ############
 sf_data$start=character(nrow(sf_data))
 sf_data$start[is.na(sf_data$Dia)]=paste0(sf_data$Año[is.na(sf_data$Dia)],"-",sf_data$Mes[is.na(sf_data$Dia)],"-01 00:00:01")
@@ -60,8 +65,6 @@ sf_data$start[sf_data$Dia %in% as.character(c(28:31))]=paste0(sf_data$Año[sf_da
 sf_data$end=as.POSIXct(sf_data$end,format="%Y-%m-%d %H:%M:%S")
 sf_data$start=as.POSIXct(sf_data$start,format="%Y-%m-%d %H:%M:%S")
 sf_data=sf_data|>select(Nivel_Sequia,Año,Mes,Dia,start,end,geometry)
-
-
 
 #Ahora creamos las categorías y la paleta de colores para la simbología de los mapas
 categorias=c("(D0) Anormalmente Seco",
@@ -81,6 +84,7 @@ paleta_categorias=colorFactor(palette = c(rgb(255,255,0, maxColorValue = 255),
 #pesaría más de 100MB, además de tardar mucho en cargar uno solo al momento de cargarlo en el index.html
 
 #Partir por periodos 2007-2013,2014-2019,2020-2022 y 2023-2025
+
 Auxiliar=sf_data
 P1=c(2007:2013)
 P2=c(2014:2019)
@@ -111,7 +115,7 @@ for(i in 1:4){
     addLegend("topright", pal = paleta_categorias,values = categorias, title = "Intensidad de Sequías",opacity = 1
     ) |> #Aquí añadimos la linea del tiempo
     
-    addTimeline(data = geojson,group = "timeline_layer", #Es una especie de "capa fantasma" para más fácil
+    addTimeline(data = geojson,group = "timeline_layer_",
                 sliderOpts = sliderOptions(duration = 15000, showTicks = TRUE,formatOutput = htmlwidgets::JS("
                 function(date) {
                     var d = new Date(date);
@@ -182,7 +186,7 @@ for(i in 1:4){
 
                  // Para ello, buscamos el input de tipo 'range' dentro de los controles del mapa, donde
                  // el slider de tiempo suele ser el único input de rango
-                 var sliderInput = document.querySelector('.leaflet-control input[type=\"range\"]');
+                 var sliderInput = el.querySelector('.leaflet-control input[type=\"range\"]');
                  
 
                      //Actualizamos el valor del slider con nuestra fechita
@@ -192,10 +196,10 @@ for(i in 1:4){
                      //uno para mover el mapa de la línea del tiempo
                      //y otro para confirmar que se movió el slider
                      //Que es la parte más fea que habíamos dicho
-                     //Cargamos las balas de la magnum...
+
                      var eventInput = new Event('input', { bubbles: true });
                      var eventChange = new Event('change', { bubbles: true });
-                     //y le disparamos a Nemesis (jeje)
+ 
                      sliderInput.dispatchEvent(eventInput);
                      sliderInput.dispatchEvent(eventChange);
 
@@ -208,8 +212,9 @@ for(i in 1:4){
       map.addControl(new DateSearchControl());
     }
   ")|>
-    addFullscreenControl()|>addLogo(img = "https://raw.githubusercontent.com/JairEsc/Gob/main/Otros_archivos/imagenes/Planeacion_sigeh.png",
-                                    ,position = "bottomright",width = 250)
-  Mapa_Sequias
+    addFullscreenControl()|>
+    addLogo(img = "https://raw.githubusercontent.com/JairEsc/Gob/main/Otros_archivos/imagenes/Planeacion_sigeh.png",
+            position = "bottomright",width = 250)
+  #Mapa_Sequias
   saveWidget(Mapa_Sequias, file = paste0("MapaSequias_Periodo",sf_data$Año[1],"_",sf_data$Año[length(sf_data$Año)],".html"), selfcontained = T)
 }

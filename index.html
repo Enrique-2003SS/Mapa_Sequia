@@ -7,24 +7,23 @@
 
     <style>
         .cuadrado {
-            width: clamp(80vw,100vw,97.5%);       /* Ancho */
-            height: clamp(10vw,100vw,97.5%);      /* Alto igual al ancho */
-            background-color: #7a003d; /* Color de fondo */
-            border: 2px solid #7a003d;    /* Borde negro */
-            /*box-shadow: 10px 10px 15px 0 rgba(0, 0, 0, 0.3); */
+            width: clamp(80vw,100vw,97.5%);       /* Contenedor para el título */
+            height: clamp(10vw,100vw,97.5%);
+            background-color: #7a003d;
+            border: 2px solid #7a003d;
             position: relative;
             z-index: 1;
         }
          .cuadrado2 {
-            width: 80vw;       /* Ancho */
-            height: 100%;      /* Alto igual al ancho */
-            background-color: #ffffff; /* Color de fondo */
-            border: 2px solid #ffffff;    /* Borde negro */
-            padding: 20px;             /* Espacio interno para el texto */
-            margin: 0 auto;              /* Espacio externo respecto a otros elementos */
+            width: 80vw;       /* Contenedor para todo lo demás */
+            height: 100%;
+            background-color: #ffffff;
+            border: 2px solid #ffffff;
+            padding: 20px;
+            margin: 0 auto;
             box-sizing: border-box;
             text-align: center;
-            box-shadow: 0px 0px 50px 0 rgba(0, 0, 0, 0.3);
+            box-shadow: 0px 0px 50px 0 rgba(0, 0, 0, 0.5);
             justify-content: center;
             position: relative;
             z-index: 0;
@@ -68,6 +67,25 @@
         h3{
             font-size: 3.5vw;
         }
+
+        /* Loader centrado sobre el iframe */
+        .loader {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8); /* Fondo semitransparente */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+        }
+
+        .loader img {
+            width: 80px;
+            height: auto;
+        }
     </style>
     <div class="cuadrado">
         <span style="color: white; font-size: clamp(30px, 7vw, 80px);">Intensidad de sequías en México 2007-2025</span>
@@ -87,7 +105,7 @@
         <strong>Sequía Excepcional (D4)</strong>: Pérdidas excepcionales y generalizadas de cultivos o pastos, riesgo excepcional de incendios, escasez total de agua en embalses, arroyos y pozos, es probable una situación de emergencia debido a la ausencia de agua.</p>
         <p style="text-align: justify; font-size: clamp(12px, 3vw, 20px);"> </p>
         <p style="text-align: justify;"> </p>
-        <p style="text-align: justify; font-size: clamp(12px, 3vw, 20px);">https://smn.conagua.gob.mx/es/?option=com_content&view=article&id=79</p>
+        <p style="text-align: justify; font-size: clamp(12px, 3vw, 20px);"><strong>Fuente: </strong>https://smn.conagua.gob.mx/es/?option=com_content&view=article&id=79</p>
         <p style="text-align: center; font-size: clamp(15px, 3vw, 20px);">Seleccione alguno de los periodos siguientes para visualizarlo</p>
         
         
@@ -101,13 +119,21 @@
         <p style="text-align: center; font-size: clamp(15px, 3vw, 20px);">Puede seleccionar cualquier fecha correspodiente a los años del periodo seleccionado</p>
         <br>
         <div id="contenedor">
-        <iframe id="miIframe" src="MapaSequias_Periodo2007_2013.html" title="Contenido interno"></iframe>
-    </div>
+            <div class="loader" id="iframeLoader">
+                <p>Cargando...</p>
+            </div>
+            <iframe id="miIframe" src="MapaSequias_Periodo2007_2013.html" title="Contenido interno"></iframe>
+        </div>
     <p style="font-size: clamp(15px, 3vw, 20px);"><strong>Fuente: </strong>Shapefiles del Monitor de Sequía en México (MSM) generados en el Servicio Meteorológico Nacional de México (SMN) de la Comisión Nacional del Agua (CONAGUA).</p>
-    <p style="font-size: clamp(12px, 3vw, 15px);"> <i>Realizado por Enrique Cerón López y el gran equipo de Planeación</i></p>
+    <p style="font-size: clamp(12px, 3vw, 15px);"> <i>Realizado por Enrique Cerón López y el equipo de Planeación</i></p>
 </div>
     <script>
         function redirigir1() {
+            loader.style.display = 'flex';
+            // Ocultar loader cuando el iframe termine de cargar
+            iframe.addEventListener('load', () => {
+            loader.style.display = 'none';
+            });
             document.getElementById("miIframe").src='http://127.0.0.1:5500/MapaSequias_Periodo2007_2013.html';
             document.getElementById("botm1").style.backgroundColor = "#7a003d";
             document.getElementById("botm1").style.color = "#ffffff";
@@ -119,7 +145,12 @@
             document.getElementById("botm4").style.color = "black";
         }
         function redirigir2() {
-            document.getElementById("miIframe").src='http://127.0.0.1:5500/MapaSequias__Periodo2014_2019.html';
+            loader.style.display = 'flex';
+            // Ocultar loader cuando el iframe termine de cargar
+            iframe.addEventListener('load', () => {
+            loader.style.display = 'none';
+            });
+            document.getElementById("miIframe").src='http://127.0.0.1:5500/MapaSequias_Periodo2014_2019.html';
             document.getElementById("botm1").style.backgroundColor = "#cecece";
             document.getElementById("botm1").style.color = "black";
             document.getElementById("botm2").style.backgroundColor = "#7a003d";
@@ -130,7 +161,12 @@
             document.getElementById("botm4").style.color = "black";
         }
         function redirigir3() {
-            document.getElementById("miIframe").src='http://127.0.0.1:5500/MapaSequias__Periodo2020_2022.html';
+            loader.style.display = 'flex';
+            // Ocultar loader cuando el iframe termine de cargar
+            iframe.addEventListener('load', () => {
+            loader.style.display = 'none';
+            });
+            document.getElementById("miIframe").src='http://127.0.0.1:5500/MapaSequias_Periodo2020_2022.html';
             document.getElementById("botm1").style.backgroundColor = "#cecece";
             document.getElementById("botm1").style.color = "black";
             document.getElementById("botm2").style.backgroundColor = "#cecece";
@@ -141,7 +177,12 @@
             document.getElementById("botm4").style.color = "black";
         }
         function redirigir4() {
-            document.getElementById("miIframe").src='http://127.0.0.1:5500/MapaSequias__Periodo2023_2025FT.html';
+            loader.style.display = 'flex';
+            // Ocultar loader cuando el iframe termine de cargar
+            iframe.addEventListener('load', () => {
+            loader.style.display = 'none';
+            });
+            document.getElementById("miIframe").src='http://127.0.0.1:5500/MapaSequias_Periodo2023_2025.html';
             document.getElementById("botm1").style.backgroundColor = "#cecece";
             document.getElementById("botm1").style.color = "black";
             document.getElementById("botm2").style.backgroundColor = "#cecece";
@@ -151,6 +192,16 @@
             document.getElementById("botm4").style.backgroundColor = "#7a003d";
             document.getElementById("botm4").style.color = "#ffffff";
         }
+        const iframe = document.getElementById('miIframe');
+        const loader = document.getElementById('iframeLoader');
+
+        // Mostrar loader al iniciar carga
+        loader.style.display = 'flex';
+
+        // Ocultar loader cuando el iframe termine de cargar
+        iframe.addEventListener('load', () => {
+            loader.style.display = 'none';
+        });
     </script>
 </body>
 </html>
